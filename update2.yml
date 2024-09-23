@@ -1,1 +1,158 @@
+    - name: Fetch latest version content from URL
+      uri:
+        url: https://api.humhub.com/v1/modules/getLatestVersion
+        method: GET
+        return_content: yes
+      register: api_response_latest_version
+
+    - name: Extract the latest version
+      set_fact:
+        latest_version: "{{ api_response_latest_version.content | from_json | json_query('latestVersion') }}"
+
+    - name: Debug after fetching latest version
+      debug:
+        msg: "Fetched latest version from API: {{ latest_version }}"
+
+    - name: Extract installed version number from common.php
+      ansible.builtin.shell: "grep -oP \"'version' => '\\K\\d+\\.\\d+\\.\\d+\" /var/www/humhub/protected/humhub/config/common.php | head -1"
+      register: installed_version
+      changed_when: false
+
+    - name: Debug after extracting installed version
+      debug:
+        msg: "Extracted installed version number: {{ installed_version.stdout }}"
+
+    - name: Construct API URL for updates
+      set_fact:
+        updates_api_url: "https://api.humhub.com/v1/modules/getHumHubUpdates?version={{ installed_version.stdout }}"
+
+    - name: Get API response for updates
+      uri:
+        url: "{{ updates_api_url }}"
+        method: GET
+        return_content: yes
+      register: api_response_updates
+
+    - name: Parse updates API response
+      set_fact:
+        updates_data: "{{ api_response_updates.content | from_json }}"
+
+    - name: Register toVersion
+      set_fact:
+        new_version: "{{ updates_data.toVersion | regex_replace('[^0-9.]+', '') }}"
+
+    - name: Construct download URL
+      set_fact:
+        download_url: "https://download.humhub.com/downloads/install/humhub-{{ new_version }}.tar.gz"
+
+    - name: Download HumHub package
+      ansible.builtin.get_url:
+        url: "{{ download_url }}"
+        dest: "/tmp/humhub-{{ new_version }}.tar.gz"
+
+    - name: Extract HumHub package to /var/www
+      ansible.builtin.unarchive:
+        src: "/tmp/humhub-{{ new_version }}.tar.gz"
+        dest: "/var/www"
+        remote_src: yes
+
+    - name: Backup existing humhub directory
+      ansible.builtin.command:
+        cmd: mv /var/www/humhub /var/www/humhub.backup
+
+    - name: Rename extracted directory to humhub
+      ansible.builtin.shell: "mv /var/www/humhub-* /var/www/humhub"
+
+    - name: Check if uploads directory exists
+      ansible.builtin.stat:
+        path: /var/www/humhub.backup/uploads
+      register: uploads_stat
+
+    - name: Copy uploads directory if it exists
+      ansible.builtin.command:
+        cmd: cp -rfa /var/www/humhub.backup/uploads /var/www/humhub
+      when: uploads_stat.stat.exists
+
+    - name: Check if config directory exists
+      ansible.builtin.stat:
+        path: /var/www/humhub.backup/protected/config
+      register: config_stat
+
+    - name: Copy config directory if it exists
+      ansible.builtin.command:
+        cmd: cp -rfa /var/www/humhub.backup/protected/config /var/www/humhub/protected
+      when: config_stat.stat.exists
+
+    - name: Check if modules directory exists
+      ansible.builtin.stat:
+        path: /var/www/humhub.backup/protected/modules
+      register: modules_stat
+
+    - name: Copy modules directory if it exists
+      ansible.builtin.command:
+        cmd: cp -rfa /var/www/humhub.backup/protected/modules /var/www/humhub/protected
+      when: modules_stat.stat.exists
+
+    - name: Check if .htaccess file exists
+      ansible.builtin.stat:
+        path: /var/www/humhub.backup/.htaccess
+      register: htaccess_stat
+
+    - name: Copy .htaccess.dist file if it exists
+      ansible.builtin.command:
+        cmd: cp -a /var/www/humhub.backup/.htaccess /var/www/humhub
+      when: htaccess_stat.stat.exists
+
+    - name: Change dir and exec php yii migrate up
+      ansible.builtin.command: >
+        /bin/sh -c "yes | php yii migrate/up --includeModuleMigrations=1"
+      args:
+        chdir: /var/www/humhub/protected/
+      register: yii_migrate_output
+
+    - name: Change dir and exec php yii update modules
+      ansible.builtin.shell:
+        cmd: php yii module/update-all
+        chdir: /var/www/humhub/protected/
+      register: yii_update_output
+
+    - name: Fix permissions for humhub directory
+      ansible.builtin.file:
+        path: /var/www/humhub
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Extract updated version number from common.php
+      ansible.builtin.shell: "grep -oP \"'version' => '\\K\\d+\\.\\d+\\.\\d+\" /var/www/humhub/protected/humhub/config/common.php | head -1"
+      register: updated_version
+      changed_when: false
+
+    - name: Check if humhub.backup exists
+      ansible.builtin.stat:
+        path: /var/www/humhub.backup
+      register: backup_stat
+
+    - name: Rename humhub.backup to include timestamp
+      ansible.builtin.command: >
+        mv /var/www/humhub.backup /var/www/humhub.{{ ansible_date_time.hour }}:{{ ansible_date_time.minute }}-{{ ansible_date_time.day }}-{{ ansible_date_time.month }}-{{ ansible_date_time.year }}
+      when: backup_stat.stat.exists
+
+##################################################################################
+    - name: Debug latest_version
+      debug:
+        msg: "Latest version: {{ latest_version }}"
+
+    - name: Debug updated_version.stdout
+      debug:
+        msg: "Updated version: {{ updated_version.stdout }}"
+
+    - name: Switch to update process if latest_version and updated_version.stdout do not match
+      include_tasks: 001_2_Updateplaybook_v2.yml
+      when: latest_version != updated_version.stdout
+
+    - name: Message when no update is needed
+      debug:
+        msg: "update done"
+      when: latest_version == updated_version.stdout
 
