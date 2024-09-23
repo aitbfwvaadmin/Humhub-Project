@@ -1,6 +1,6 @@
 ---
 - hosts: humhub_server
-  become: true
+  become: yes
   become_user: sema
   gather_facts: true
 
