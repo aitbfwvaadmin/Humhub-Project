@@ -1,1 +1,63 @@
+---
+- hosts: final
+  become: true
+  become_user: sema
+  gather_facts: true
+  tasks:
+
+    - name: Stop apache2 service
+      ansible.builtin.systemd:
+        name: apache2.service
+        state: stopped
+
+    - name: Debug after stopping nginx
+      debug:
+        msg: "apache2 service has been stopped."
+
+    - name: Stop cron service
+      ansible.builtin.systemd:
+        name: cron.service
+        state: stopped
+
+##########################################################################
+
+    - name: Fetch latest version content from URL
+      uri:
+        url: https://api.humhub.com/v1/modules/getLatestVersion
+        method: GET
+        return_content: yes
+      register: api_response_latest_version
+
+    - name: Extract the latest version
+      set_fact:
+        latest_version: "{{ api_response_latest_version.content | from_json | json_query('latestVersion') }}"
+
+    - name: Debug after fetching latest version
+      debug:
+        msg: "Fetched latest version from API: {{ latest_version }}"
+
+    - name: Extract installed version number from common.php
+      ansible.builtin.shell: "grep -oP \"'version' => '\\K\\d+\\.\\d+\\.\\d+\" /var/www/humhub/protected/humhub/config/common.php | head -1"
+      register: installed_version
+      changed_when: false
+
+    - name: Debug after extracting installed version
+      debug:
+        msg: "Extracted installed version number: {{ installed_version.stdout }}"
+
+    - name: Switch to update process if latest_version and installed_version do not match
+      include_tasks: 001_2_Updateplaybook_v2.yml
+      when: latest_version != installed_version.stdout
+
+#############################################################################
+
+    - name: Start apache2
+      ansible.builtin.systemd:
+        name: apache2.service
+        state: started
+
+    - name: Start cron service
+      ansible.builtin.systemd:
+        name: cron.service
+        state: started
 
