@@ -10,7 +10,7 @@
         name: apache2.service
         state: stopped
 
-    - name: Debug after stopping nginx
+    - name: Debug after stopping apache2
       debug:
         msg: "apache2 service has been stopped."
 
@@ -46,7 +46,7 @@
         msg: "Extracted installed version number: {{ installed_version.stdout }}"
 
     - name: Switch to update process if latest_version and installed_version do not match
-      include_tasks: 001_2_Updateplaybook_v2.yml
+      include_tasks: update2.yml
       when: latest_version != installed_version.stdout
 
 #############################################################################
