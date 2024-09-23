@@ -7,3 +7,8 @@
   tasks:
     - name: Ping test to check connectivity
       ansible.builtin.ping:
+      
+    - name: Stop Apache2 service
+      ansible.builtin.service:
+        name: apache2
+        state: stopped
