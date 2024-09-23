@@ -1,0 +1,15 @@
+---
+- hosts: humhub_server
+  become: true
+  become_user: sema
+  gather_facts: true
+  tasks:
+
+    - name: Stop apache2 service
+      ansible.builtin.systemd:
+        name: apache2.service
+        state: stopped
+
+    - name: Debug after stopping nginx
+      debug:
+        msg: "apache2 service has been stopped."
