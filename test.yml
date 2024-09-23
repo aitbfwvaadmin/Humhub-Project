@@ -1,7 +1,7 @@
 ---
 - hosts: humhub_server
   become: true
-  become_user: root
+  become_user: sema
   gather_facts: true
 
   tasks:
