@@ -12,3 +12,4 @@
       ansible.builtin.service:
         name: apache2
         state: stopped
+      become: yes
