@@ -93,15 +93,26 @@
         cmd: cp -rfa /var/www/humhub.backup/protected/modules /var/www/humhub/protected
       when: modules_stat.stat.exists
 
-    - name: Check if .htaccess file exists
+    - name: Check if .htaccess.dist file exists
       ansible.builtin.stat:
-        path: /var/www/humhub.backup/.htaccess
+        path: /var/www/humhub.backup/.htaccess.dist
       register: htaccess_stat
 
     - name: Copy .htaccess.dist file if it exists
       ansible.builtin.command:
-        cmd: cp -a /var/www/humhub.backup/.htaccess /var/www/humhub
+        cmd: cp -a /var/www/humhub.backup/.htaccess.dist /var/www/humhub
       when: htaccess_stat.stat.exists
+
+    # Themes restore from Backup
+    - name: Check if themes directory exists
+      ansible.builtin.stat:
+        path: /var/www/humhub.backup/themes
+      register: themes_stat
+
+    - name: Copy themes directory if it exists
+      ansible.builtin.command:
+        cmd: cp -rfa /var/www/humhub.backup/themes /var/www/humhub/
+      when: themes_stat.stat.exists
 
     - name: Change dir and exec php yii migrate up
       ansible.builtin.command: >
@@ -133,10 +144,22 @@
         path: /var/www/humhub.backup
       register: backup_stat
 
-    - name: Rename humhub.backup to include timestamp
-      ansible.builtin.command: >
-        mv /var/www/humhub.backup /var/www/humhub.{{ ansible_date_time.hour }}:{{ ansible_date_time.minute }}-{{ ansible_date_time.day }}-{{ ansible_date_time.month }}-{{ ansible_date_time.year }}
-      when: backup_stat.stat.exists
+    - name: Gather time-related facts again
+      ansible.builtin.setup:
+        filter: ansible_date_time
+
+    - name: Copy humhub.backup to timestamp
+      ansible.builtin.copy:
+        src: /var/www/humhub.backup
+        dest: /var/www/humhub.{{ ansible_date_time.hour }}:{{ ansible_date_time.minute }}:{{ ansible_date_time.second }}-{{ ansible_date_time.day }}-{{ ansible_date_time.month }}-{{ ansible_date_time.year }}
+        remote_src: yes
+
+    - name: Delete content & directory
+      ansible.builtin.file:
+        state: absent
+        path: /var/www/humhub.backup
+
+ 
 
 ##################################################################################
     - name: Debug latest_version
@@ -148,11 +171,10 @@
         msg: "Updated version: {{ updated_version.stdout }}"
 
     - name: Switch to update process if latest_version and updated_version.stdout do not match
-      include_tasks: update2.yml
+      include_tasks: humhub_update.yml
       when: latest_version != updated_version.stdout
 
     - name: Message when no update is needed
       debug:
         msg: "update done"
       when: latest_version == updated_version.stdout
-
