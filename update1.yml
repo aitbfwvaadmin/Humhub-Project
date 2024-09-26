@@ -48,7 +48,7 @@
         msg: "Extracted installed version number: {{ installed_version.stdout }}"
 
     - name: Switch to update process if latest_version and installed_version do not match
-      include_tasks: humhub_update2.yml
+      include_tasks: update2.yml
       when: latest_version != installed_version.stdout
 
 #############################################################################
