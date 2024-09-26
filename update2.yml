@@ -93,14 +93,14 @@
         cmd: cp -rfa /var/www/humhub.backup/protected/modules /var/www/humhub/protected
       when: modules_stat.stat.exists
 
-    - name: Check if .htaccess.dist file exists
+    - name: Check if .htaccess file exists
       ansible.builtin.stat:
-        path: /var/www/humhub.backup/.htaccess.dist
+        path: /var/www/humhub.backup/.htaccess
       register: htaccess_stat
 
-    - name: Copy .htaccess.dist file if it exists
+    - name: Copy .htaccess file if it exists
       ansible.builtin.command:
-        cmd: cp -a /var/www/humhub.backup/.htaccess.dist /var/www/humhub
+        cmd: cp -a /var/www/humhub.backup/.htaccess /var/www/humhub
       when: htaccess_stat.stat.exists
 
     # Themes restore from Backup
