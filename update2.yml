@@ -171,7 +171,7 @@
         msg: "Updated version: {{ updated_version.stdout }}"
 
     - name: Switch to update2 process if latest_version and updated_version.stdout do not match
-      include_tasks: humhub_update2.yml
+      include_tasks: update2.yml
       when: latest_version != updated_version.stdout
 
     - name: Message when no update is needed
