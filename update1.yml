@@ -1,23 +1,25 @@
 ---
 - hosts: humhub_server
-  become: yes
-  become_user: root
+  become: true
   gather_facts: true
   tasks:
 
     - name: Stop apache2 service
-      ansible.builtin.systemd:
-        name: apache2.service
-        state: stopped
+      ansible.builtin.command:
+        cmd: sudo systemctl stop apache2.service
 
     - name: Debug after stopping apache2
       debug:
         msg: "apache2 service has been stopped."
 
     - name: Stop cron service
-      ansible.builtin.systemd:
-        name: cron.service
-        state: stopped
+      ansible.builtin.command:
+        cmd: sudo systemctl stop cron.service
+
+    - name: Debug after stopping nginx
+      debug:
+        msg: "cron service has been stopped."
+
 
 ##########################################################################
 
@@ -46,18 +48,23 @@
         msg: "Extracted installed version number: {{ installed_version.stdout }}"
 
     - name: Switch to update process if latest_version and installed_version do not match
-      include_tasks: update2.yml
+      include_tasks: humhub_update.yml
       when: latest_version != installed_version.stdout
 
 #############################################################################
 
-    - name: Start apache2
-      ansible.builtin.systemd:
-        name: apache2.service
-        state: started
+    - name: Start apache2 service
+      ansible.builtin.command:
+        cmd: sudo systemctl start apache2.service
+
+    - name: Debug after starting apache2
+      debug:
+        msg: "apache2 service has been started."
 
     - name: Start cron service
-      ansible.builtin.systemd:
-        name: cron.service
-        state: started
+      ansible.builtin.command:
+        cmd: sudo systemctl start cron.service
 
+    - name: Debug after starting nginx
+      debug:
+        msg: "cron service has been started."
